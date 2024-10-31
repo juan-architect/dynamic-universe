@@ -86,5 +86,25 @@ export class CharactersService {
     }
   }
 
-  // Additional methods like relocate, etc., should also be updated similarly.
+  async relocate(characterId: string, planetId: string): Promise<Character> {
+    const character = await this.charactersRepository.findOne({
+      where: { id: characterId },
+      relations: ['currentLocation'],
+    });
+
+    if (!character) {
+      throw new NotFoundException(`Character with ID ${characterId} not found`);
+    }
+
+    const planet = await this.planetsRepository.findOne({
+      where: { id: planetId },
+    });
+
+    if (!planet) {
+      throw new NotFoundException(`Planet with ID ${planetId} not found`);
+    }
+
+    character.currentLocation = planet;
+    return this.charactersRepository.save(character);
+  }
 }
