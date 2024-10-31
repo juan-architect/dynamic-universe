@@ -1,6 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, Not } from 'typeorm';
+// Import the Cache module
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { CacheManagerStore } from 'cache-manager';
 
 import { Starship } from '../entities/starship.entity';
 import { Character } from '../entities/character.entity';
@@ -17,6 +20,7 @@ export class StarshipsService {
     private charactersRepository: Repository<Character>,
     @InjectRepository(Planet)
     private planetsRepository: Repository<Planet>,
+    @Inject(CACHE_MANAGER) private cacheManager: CacheManagerStore,
   ) { }
 
   async create(createStarshipDto: CreateStarshipDto): Promise<Starship> {
@@ -40,16 +44,42 @@ export class StarshipsService {
       enemies,
     });
 
-    return this.starshipsRepository.save(starship);
+    const savedStarship = await this.starshipsRepository.save(starship);
+
+    // Invalidate cache
+    await this.cacheManager.del('starships');
+
+    return savedStarship;
   }
 
-  findAll(): Promise<Starship[]> {
-    return this.starshipsRepository.find({
+  async findAll(): Promise<Starship[]> {
+    const cacheKey = 'starships';
+    const cachedStarships = (await this.cacheManager.get(
+      cacheKey,
+    )) as Starship[] | undefined;
+
+    if (cachedStarships) {
+      return cachedStarships;
+    }
+
+    const starships = await this.starshipsRepository.find({
       relations: ['passengers', 'enemies'],
     });
+    await this.cacheManager.set(cacheKey, starships, 300);
+
+    return starships;
   }
 
   async findOne(id: string): Promise<Starship> {
+    const cacheKey = `starship:${id}`;
+    const cachedStarship = (await this.cacheManager.get(
+      cacheKey,
+    )) as Starship | undefined;
+
+    if (cachedStarship) {
+      return cachedStarship;
+    }
+
     const starship = await this.starshipsRepository.findOne({
       where: { id },
       relations: ['passengers', 'enemies'],
@@ -57,6 +87,9 @@ export class StarshipsService {
     if (!starship) {
       throw new NotFoundException(`Starship with ID ${id} not found`);
     }
+
+    await this.cacheManager.set(cacheKey, starship, 300);
+
     return starship;
   }
 
@@ -88,7 +121,13 @@ export class StarshipsService {
     }
 
     Object.assign(starship, updateStarshipDto);
-    return this.starshipsRepository.save(starship);
+    const updatedStarship = await this.starshipsRepository.save(starship);
+
+    // Invalidate cache
+    await this.cacheManager.del('starships');
+    await this.cacheManager.del(`starship:${id}`);
+
+    return updatedStarship;
   }
 
   async remove(id: string): Promise<void> {
@@ -96,6 +135,10 @@ export class StarshipsService {
     if (result.affected === 0) {
       throw new NotFoundException(`Starship with ID ${id} not found`);
     }
+
+    // Invalidate cache
+    await this.cacheManager.del('starships');
+    await this.cacheManager.del(`starship:${id}`);
   }
 
   async boardPassenger(
@@ -219,9 +262,9 @@ export class StarshipsService {
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
       Math.cos(this.deg2rad(lat1)) *
-        Math.cos(this.deg2rad(lat2)) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
+      Math.cos(this.deg2rad(lat2)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const distance = R * c; // Distance in km
     return distance;

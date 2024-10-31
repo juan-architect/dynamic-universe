@@ -1,6 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
+// Import the Cache module
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { CacheManagerStore } from 'cache-manager';
 
 import { Character } from '../entities/character.entity';
 import { CreateCharacterDto } from './dto/create-character.dto';
@@ -14,7 +17,8 @@ export class CharactersService {
     private charactersRepository: Repository<Character>,
     @InjectRepository(Planet)
     private planetsRepository: Repository<Planet>,
-  ) {}
+    @Inject(CACHE_MANAGER) private cacheManager: CacheManagerStore,
+  ) { }
 
   async create(createCharacterDto: CreateCharacterDto): Promise<Character> {
     const { currentLocationId, ...rest } = createCharacterDto;
@@ -32,14 +36,42 @@ export class CharactersService {
       ...rest,
       currentLocation: planet,
     });
-    return this.charactersRepository.save(character);
+    const savedCharacter = await this.charactersRepository.save(character);
+
+    // Invalidate cache
+    await this.cacheManager.del('characters');
+
+    return savedCharacter;
   }
 
-  findAll(): Promise<Character[]> {
-    return this.charactersRepository.find({ relations: ['currentLocation'] });
+  async findAll(): Promise<Character[]> {
+    const cacheKey = 'characters';
+    const cachedCharacters = (await this.cacheManager.get(
+      cacheKey,
+    )) as Character[] | undefined;
+
+    if (cachedCharacters) {
+      return cachedCharacters;
+    }
+
+    const characters = await this.charactersRepository.find({
+      relations: ['currentLocation'],
+    });
+    await this.cacheManager.set(cacheKey, characters, 300);
+
+    return characters;
   }
 
   async findOne(id: string): Promise<Character> {
+    const cacheKey = `character:${id}`;
+    const cachedCharacter = (await this.cacheManager.get(
+      cacheKey,
+    )) as Character | undefined;
+
+    if (cachedCharacter) {
+      return cachedCharacter;
+    }
+
     const character = await this.charactersRepository.findOne({
       where: { id },
       relations: ['currentLocation'],
@@ -47,6 +79,9 @@ export class CharactersService {
     if (!character) {
       throw new NotFoundException(`Character with ID ${id} not found`);
     }
+
+    await this.cacheManager.set(cacheKey, character, 300);
+
     return character;
   }
 
@@ -76,7 +111,13 @@ export class CharactersService {
     }
 
     Object.assign(character, updateCharacterDto);
-    return this.charactersRepository.save(character);
+    const updatedCharacter = await this.charactersRepository.save(character);
+
+    // Invalidate cache
+    await this.cacheManager.del('characters');
+    await this.cacheManager.del(`character:${id}`);
+
+    return updatedCharacter;
   }
 
   async remove(id: string): Promise<void> {
@@ -84,6 +125,10 @@ export class CharactersService {
     if (result.affected === 0) {
       throw new NotFoundException(`Character with ID ${id} not found`);
     }
+
+    // Invalidate cache
+    await this.cacheManager.del('characters');
+    await this.cacheManager.del(`character:${id}`);
   }
 
   async relocate(characterId: string, planetId: string): Promise<Character> {
