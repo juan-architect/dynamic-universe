@@ -16,7 +16,7 @@ import { UpdateStarshipInput } from './dto/update-starship.input';
 
 @Controller('starships')
 export class StarshipsController {
-  constructor(private readonly starshipsService: StarshipsService) { }
+  constructor(private readonly starshipsService: StarshipsService) {}
 
   @Post()
   @UsePipes(new ValidationPipe({ whitelist: true }))
