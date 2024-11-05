@@ -1,99 +1,249 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Dynamic Universe - Starship Management System 🚀
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A sophisticated GraphQL API built with NestJS and TypeORM that simulates a dynamic universe where starships, characters, and planets interact in a rich space-themed environment. The system provides comprehensive fleet management, character tracking, and planetary operations.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://coveralls.io/github/nestjs/nest?branch=master" target="_blank"><img src="https://coveralls.io/repos/github/nestjs/nest/badge.svg?branch=master#9" alt="Coverage" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+[![TypeScript](https://img.shields.io/badge/TypeScript-4.9.5-blue.svg)](https://www.typescriptlang.org/)
+[![NestJS](https://img.shields.io/badge/NestJS-10.0.0-red.svg)](https://nestjs.com/)
+[![GraphQL](https://img.shields.io/badge/GraphQL-16.8.1-pink.svg)](https://graphql.org/)
+[![TypeORM](https://img.shields.io/badge/TypeORM-0.3.17-orange.svg)](https://typeorm.io/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14.0-blue.svg)](https://www.postgresql.org/)
 
-## Description
+## Table of Contents
+- [Overview](#overview)
+- [Core Features](#core-features)
+- [Domain Model](#domain-model)
+- [System Architecture](#system-architecture)
+- [API Documentation](#api-documentation)
+- [Installation & Setup](#installation--setup)
+- [Development](#development)
+- [Testing](#testing)
+- [Deployment](#deployment)
+- [Contributing](#contributing)
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Overview
 
-## Project setup
+Dynamic Universe is an enterprise-grade starship management system that simulates a rich space environment where starships traverse between planets, characters embark on journeys, and complex space operations are managed through a robust GraphQL API.
 
-```bash
-$ yarn install
+### Core Features 🌟
+
+#### Starship Management 🚀
+- Fleet creation and management
+- Passenger boarding and disembarking
+- Travel between planets with distance calculations
+- Enemy starship tracking and detection
+- Cargo capacity management
+- Current location tracking
+
+#### Character System 👤
+- Character creation and management
+- Species and Force sensitivity tracking
+- Home world and current location management
+- Starship assignments
+- Travel history
+
+#### Planetary System 🌍
+- Planet registration and management
+- Climate and terrain tracking
+- Population management
+- Coordinates system for distance calculation
+- Resident and native tracking
+
+## Domain Model
+
+### Entities and Relationships
+
+#### Starship Entity
+```typescript
+class Starship {
+  id: string;                    // Unique identifier
+  name: string;                  // Starship name
+  model?: string;                // Starship model
+  cargoCapacity?: number;        // Cargo capacity in tons
+  currentLocation?: Coordinates; // Current spatial coordinates
+  currentStation?: Planet;       // Current stationed planet
+  passengers?: Character[];      // Characters aboard
+  enemies?: Starship[];         // Enemy starships
+}
 ```
 
-## Compile and run the project
+Key Features:
+- Location tracking with coordinates
+- Passenger management
+- Enemy tracking
+- Station management
 
-```bash
-# development
-$ yarn run start
-
-# watch mode
-$ yarn run start:dev
-
-# production mode
-$ yarn run start:prod
+#### Character Entity
+```typescript
+class Character {
+  id: string;                // Unique identifier
+  name: string;              // Character name
+  species?: string;          // Species type
+  isForceSensitive: boolean; // Force sensitivity indicator
+  currentLocation?: Planet;  // Current planet location
+  homeWorld?: Planet;        // Home planet
+  starships?: Starship[];    // Associated starships
+}
 ```
 
-## Run tests
+Key Features:
+- Force sensitivity tracking
+- Home world association
+- Current location tracking
+- Starship associations
 
+#### Planet Entity
+```typescript
+class Planet {
+  id: string;                    // Unique identifier
+  name: string;                  // Planet name
+  climate?: string;              // Climate description
+  terrain?: string;              // Terrain description
+  population?: number;           // Population count
+  currentLocation?: Coordinates; // Spatial coordinates
+  residents?: Character[];       // Current residents
+  natives?: Character[];         // Native characters
+  stationedStarships?: Starship[]; // Stationed starships
+}
+```
+
+Key Features:
+- Environmental characteristics
+- Population tracking
+- Resident management
+- Starship docking
+
+## System Architecture
+
+### Technical Stack
+```
+┌─────────────────────────────────────────┐
+│              GraphQL API                │
+│  ┌─────────────┐      ┌─────────────┐  │
+│  │   Queries   │      │  Mutations  │  │
+│  └─────────────┘      └─────────────┘  │
+├─────────────────────────────────────────┤
+│           Business Logic Layer          │
+│  ┌─────────────┐      ┌─────────────┐  │
+│  │  Services   │      │  Resolvers  │  │
+│  └─────────────┘      └─────────────┘  │
+├─────────────────────────────────────────┤
+│            Data Access Layer           │
+│  ┌─────────────┐      ┌─────────────┐  │
+│  │  TypeORM    │      │ PostgreSQL  │  │
+│  └─────────────┘      └─────────────┘  │
+└─────────────────────────────────────────┘
+```
+
+## Installation & Setup
+
+1. Clone repository:
 ```bash
-# unit tests
-$ yarn run test
+git clone https://github.com/juan-architect/dynamic-universe.git
+cd dynamic-universe
+```
 
-# e2e tests
-$ yarn run test:e2e
+2. Install dependencies:
+```bash
+npm install
+```
 
-# test coverage
-$ yarn run test:cov
+3. Set up environment variables:
+```bash
+cp .env.example .env
+# Edit .env with your configurations
+```
+
+4. Run migrations:
+```bash
+npm run typeorm migration:run
+```
+
+5. Start development server:
+```bash
+npm run start:dev
 ```
 
 ## Deployment
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+### AWS Infrastructure (Terraform)
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+```hcl
+# VPC Configuration
+module "vpc" {
+  source = "./modules/vpc"
+  name   = "dynamic-universe-vpc"
+  cidr   = "10.0.0.0/16"
+}
 
-```bash
-$ yarn install -g mau
-$ mau deploy
+# ECS Fargate Configuration
+module "ecs" {
+  source = "./modules/ecs"
+  name   = "dynamic-universe-cluster"
+  vpc_id = module.vpc.vpc_id
+}
+
+# RDS Instance
+module "rds" {
+  source = "./modules/rds"
+  name   = "dynamic-universe-db"
+  engine_version = "14.0"
+}
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### Deploy Steps
 
-## Resources
+1. Initialize Terraform:
+```bash
+cd terraform && terraform init
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+2. Apply infrastructure:
+```bash
+terraform apply
+```
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+3. Deploy application:
+```bash
+docker build -t dynamic-universe .
+docker push ${ECR_REPO}/dynamic-universe:latest
+```
 
-## Support
+## Testing
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+```bash
+# Unit tests
+npm run test
 
-## Stay in touch
+# Integration tests
+npm run test:e2e
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+# Coverage report
+npm run test:cov
+```
+
+## Project Structure
+```
+dynamic-universe/
+├── src/
+│   ├── characters/        # Character module
+│   ├── common/           # Shared utilities
+│   ├── entities/         # Domain entities
+│   ├── interceptors/     # Request interceptors
+│   ├── planets/         # Planet module
+│   ├── starships/       # Starship module
+│   └── main.ts          # Application entry
+├── terraform/           # Infrastructure code
+└── test/               # E2E tests
+```
+
+## Contact
+
+**Principal Architect**: Juan Arias  
+**Email**: juanariasmail@gmail.com  
+**GitHub**: [@juan-architect](https://github.com/juan-architect)
 
 ## License
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
