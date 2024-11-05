@@ -36,7 +36,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
     GraphQLModule.forRoot<ApolloDriverConfig>({
       // The <ApolloDriverConfig> generic ensures that TypeScript knows about the specific configuration options available for the Apollo driver.
       autoSchemaFile: 'schema.gql',
-      playground: true, // Enables GraphQL Playground so we dont need to use Swagger for this case
+      playground: true, // Enables GraphQL Playground so we don't need to use Swagger for this case
       driver: ApolloDriver,
       installSubscriptionHandlers: true,
     }),

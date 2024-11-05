@@ -13,9 +13,9 @@ type Starship {
   model: String
   cargoCapacity: Float
   currentLocation: Coordinates
-  currentStation: Planet
-  passengers: [Character!]
-  enemies: [Starship!]
+  currentStation: Planet!
+  passengers: [Character!]!
+  enemies: [Starship!]!
 }
 
 type Character {
@@ -23,9 +23,9 @@ type Character {
   name: String!
   species: String
   isForceSensitive: Boolean!
-  currentLocation: Planet
+  currentLocation: Planet!
   homeWorld: Planet
-  starships: [Starship!]
+  starships: [Starship!]!
 }
 
 type Planet {
@@ -43,12 +43,29 @@ type Planet {
 type Query {
   planets: [Planet!]!
   planet(id: ID!): Planet!
+  characters: [Character!]!
+  character(id: ID!): Character!
+  starships: [Starship!]!
+  starship(id: ID!): Starship!
+  calculateDistance(starshipId: ID!, planetId: ID!): Float!
+  findNearbyEnemies(starshipId: ID!, rangeInKm: Float!): [Starship!]!
 }
 
 type Mutation {
   createPlanet(createPlanetInput: CreatePlanetInput!): Planet!
   updatePlanet(id: ID!, updatePlanetInput: UpdatePlanetInput!): Planet!
   deletePlanet(id: ID!): Boolean!
+  createCharacter(createCharacterInput: CreateCharacterInput!): Character!
+  updateCharacter(id: ID!, updateCharacterInput: UpdateCharacterInput!): Character!
+  deleteCharacter(id: ID!): Boolean!
+  relocateCharacter(id: ID!, relocateCharacterInput: RelocateCharacterInput!): Character!
+  createStarship(createStarshipInput: CreateStarshipInput!): Starship!
+  updateStarship(id: ID!, updateStarshipInput: UpdateStarshipInput!): Starship!
+  deleteStarship(id: ID!): Boolean!
+  boardPassenger(starshipId: ID!, characterId: ID!): Starship!
+  disembarkPassenger(starshipId: ID!, characterId: ID!): Starship!
+  travel(starshipId: ID!, planetId: ID!): Starship!
+  spawnEnemies(count: Int!): [Starship!]!
 }
 
 input CreatePlanetInput {
@@ -70,4 +87,46 @@ input UpdatePlanetInput {
   population: Float
   climate: String
   terrain: String
+}
+
+input CreateCharacterInput {
+  name: String!
+  species: String
+  isForceSensitive: Boolean!
+  currentLocationId: ID
+  starshipIds: [ID!]
+}
+
+input UpdateCharacterInput {
+  name: String
+  species: String
+  isForceSensitive: Boolean
+  currentLocationId: ID
+  starshipIds: [ID!]
+  id: ID!
+}
+
+input RelocateCharacterInput {
+  newLocationId: ID!
+}
+
+input CreateStarshipInput {
+  name: String!
+  model: String
+  cargoCapacity: Float
+  currentLocation: CoordinatesInput
+  currentStationId: ID
+  passengerIds: [ID!]
+  enemyIds: [ID!]
+}
+
+input UpdateStarshipInput {
+  name: String
+  model: String
+  cargoCapacity: Float
+  currentLocation: CoordinatesInput
+  currentStationId: ID
+  passengerIds: [ID!]
+  enemyIds: [ID!]
+  id: ID!
 }
