@@ -3,32 +3,46 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CacheModule } from '@nestjs/cache-manager';
-import { redisStore } from 'cache-manager-redis-yet';
 import { PlanetsModule } from './planets/planets.module';
 import { CharactersModule } from './characters/characters.module';
 import { StarshipsModule } from './starships/starships.module';
 import { GraphQLModule } from '@nestjs/graphql';
+import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 
 @Module({
   imports: [
-    TypeOrmModule.forRoot(),
-    CacheModule.registerAsync({
-      useFactory: async () => ({
-        store: await redisStore({
-          socket: {
-            host: 'localhost', // or other Redis host
-            port: 6379,        // or other Redis port
-          },
-          ttl: 300, // default Time-To-Live in seconds
-        }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+    }),
+    TypeOrmModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        type: 'postgres',
+        host: configService.get('DB_HOST', 'localhost'),
+        port: configService.get<number>('DB_PORT', 5432),
+        username: configService.get('DB_USERNAME', 'postgres'),
+        password: configService.get('DB_PASSWORD', 'postgres'),
+        database: configService.get('DB_NAME', 'postgres'),
+        entities: [__dirname + '/**/*.entity{.ts,.js}'],
+        synchronize: true, // Don't use in production
       }),
+      inject: [ConfigService],
     }),
-    GraphQLModule.forRoot({
+    CacheModule.register({
+      isGlobal: true,
+      ttl: 5000, // Cache expiration -> If using cache-manager v4, provide ttl in seconds v5, provide ttl in milliseconds
+    }),
+    GraphQLModule.forRoot<ApolloDriverConfig>({
+      // The <ApolloDriverConfig> generic ensures that TypeScript knows about the specific configuration options available for the Apollo driver.
       autoSchemaFile: 'schema.gql',
+      playground: true, // Enables GraphQL Playground so we dont need to use Swagger for this case
+      driver: ApolloDriver,
+      installSubscriptionHandlers: true,
     }),
-    PlanetsModule, 
-    CharactersModule, 
-    StarshipsModule
+    PlanetsModule,
+    CharactersModule,
+    StarshipsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

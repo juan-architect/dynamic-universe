@@ -10,8 +10,8 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import { PlanetsService } from './planets.service';
-import { CreatePlanetDto } from './dto/create-planet.dto';
-import { UpdatePlanetDto } from './dto/update-planet.dto';
+import { CreatePlanetInput } from './dto/create-planet.input';
+import { UpdatePlanetInput } from './dto/update-planet.input';
 
 @Controller('planets')
 export class PlanetsController {
@@ -19,7 +19,7 @@ export class PlanetsController {
 
   @Post()
   @UsePipes(new ValidationPipe({ whitelist: true }))
-  create(@Body() createPlanetDto: CreatePlanetDto) {
+  create(@Body() createPlanetDto: CreatePlanetInput) {
     return this.planetsService.create(createPlanetDto);
   }
 
@@ -35,10 +35,7 @@ export class PlanetsController {
 
   @Put(':id')
   @UsePipes(new ValidationPipe({ whitelist: true }))
-  update(
-    @Param('id') id: string,
-    @Body() updatePlanetDto: UpdatePlanetDto,
-  ) {
+  update(@Param('id') id: string, @Body() updatePlanetDto: UpdatePlanetInput) {
     return this.planetsService.update(id, updatePlanetDto);
   }
 

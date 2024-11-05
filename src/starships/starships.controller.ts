@@ -11,8 +11,8 @@ import {
   Query,
 } from '@nestjs/common';
 import { StarshipsService } from './starships.service';
-import { CreateStarshipDto } from './dto/create-starship.dto';
-import { UpdateStarshipDto } from './dto/update-starship.dto';
+import { CreateStarshipInput } from './dto/create-starship.input';
+import { UpdateStarshipInput } from './dto/update-starship.input';
 
 @Controller('starships')
 export class StarshipsController {
@@ -20,7 +20,7 @@ export class StarshipsController {
 
   @Post()
   @UsePipes(new ValidationPipe({ whitelist: true }))
-  create(@Body() createStarshipDto: CreateStarshipDto) {
+  create(@Body() createStarshipDto: CreateStarshipInput) {
     return this.starshipsService.create(createStarshipDto);
   }
 
@@ -38,7 +38,7 @@ export class StarshipsController {
   @UsePipes(new ValidationPipe({ whitelist: true }))
   update(
     @Param('id') id: string,
-    @Body() updateStarshipDto: UpdateStarshipDto,
+    @Body() updateStarshipDto: UpdateStarshipInput,
   ) {
     return this.starshipsService.update(id, updateStarshipDto);
   }

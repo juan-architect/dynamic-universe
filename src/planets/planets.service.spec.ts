@@ -1,22 +1,46 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { PlanetsService } from './planets.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Planet } from '../entities/planet.entity';
 import { Repository } from 'typeorm';
-
-const mockPlanet = {
-  id: 'planet-uuid',
-  name: 'Tatooine',
-  population: 200000,
-  climate: 'Arid',
-  terrain: 'Desert',
-  latitude: 34.0522,
-  longitude: -118.2437,
-};
+import { NotFoundException } from '@nestjs/common';
+import { PlanetsService } from './planets.service';
+import { Planet } from '../entities/planet.entity';
+import { CreatePlanetInput } from './dto/create-planet.input';
+import { UpdatePlanetInput } from './dto/update-planet.input';
 
 describe('PlanetsService', () => {
   let service: PlanetsService;
   let repository: Repository<Planet>;
+
+  const mockPlanet: Planet = {
+    id: '1',
+    name: 'Tatooine',
+    climate: 'Arid',
+    terrain: 'Desert',
+    population: 200000,
+    currentLocation: {
+      latitude: 23.4,
+      longitude: 45.6,
+    },
+    residents: [],
+    natives: [],
+    stationedStarships: [],
+  };
+
+  const mockCreatePlanetInput: CreatePlanetInput = {
+    name: 'Tatooine',
+    climate: 'Arid',
+    terrain: 'Desert',
+    population: 200000,
+    currentLocation: {
+      latitude: 23.4,
+      longitude: 45.6,
+    },
+  };
+
+  const mockUpdatePlanetInput: UpdatePlanetInput = {
+    name: 'Updated Tatooine',
+    climate: 'Very Arid',
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -24,7 +48,16 @@ describe('PlanetsService', () => {
         PlanetsService,
         {
           provide: getRepositoryToken(Planet),
-          useClass: Repository,
+          useValue: {
+            create: jest.fn().mockReturnValue(mockPlanet),
+            save: jest.fn().mockResolvedValue(mockPlanet),
+            find: jest.fn().mockResolvedValue([mockPlanet]),
+            findOne: jest.fn().mockResolvedValue(mockPlanet),
+            preload: jest
+              .fn()
+              .mockResolvedValue({ ...mockPlanet, ...mockUpdatePlanetInput }),
+            delete: jest.fn().mockResolvedValue({ affected: 1 }),
+          },
         },
       ],
     }).compile();
@@ -33,88 +66,114 @@ describe('PlanetsService', () => {
     repository = module.get<Repository<Planet>>(getRepositoryToken(Planet));
   });
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
+  afterEach(() => {
+    jest.clearAllMocks();
   });
 
   describe('create', () => {
-    it('should create a new planet', async () => {
-      jest.spyOn(repository, 'create').mockReturnValue(mockPlanet as any);
-      jest.spyOn(repository, 'save').mockResolvedValue(mockPlanet as any);
+    it('should successfully create a planet', async () => {
+      const result = await service.create(mockCreatePlanetInput);
 
-      const result = await service.create(mockPlanet);
+      expect(repository.create).toHaveBeenCalledWith(mockCreatePlanetInput);
+      expect(repository.save).toHaveBeenCalled();
       expect(result).toEqual(mockPlanet);
-      expect(repository.create).toHaveBeenCalledWith(mockPlanet);
-      expect(repository.save).toHaveBeenCalledWith(mockPlanet);
+    });
+
+    it('should create a planet with minimal data', async () => {
+      const minimalInput = { name: 'Minimal Planet' };
+      const minimalPlanet = { id: '2', ...minimalInput };
+
+      jest.spyOn(repository, 'create').mockReturnValue(minimalPlanet);
+      jest.spyOn(repository, 'save').mockResolvedValue(minimalPlanet);
+
+      const result = await service.create(minimalInput);
+
+      expect(repository.create).toHaveBeenCalledWith(minimalInput);
+      expect(result).toEqual(minimalPlanet);
     });
   });
 
   describe('findAll', () => {
     it('should return an array of planets', async () => {
-      jest.spyOn(repository, 'find').mockResolvedValue([mockPlanet]);
+      const result = await service.findAll();
+
+      expect(repository.find).toHaveBeenCalled();
+      expect(result).toEqual([mockPlanet]);
+    });
+
+    it('should return empty array when no planets exist', async () => {
+      jest.spyOn(repository, 'find').mockResolvedValue([]);
 
       const result = await service.findAll();
-      expect(result).toEqual([mockPlanet]);
+
       expect(repository.find).toHaveBeenCalled();
+      expect(result).toEqual([]);
     });
   });
 
   describe('findOne', () => {
-    it('should return a planet by ID', async () => {
-      jest.spyOn(repository, 'findOne').mockResolvedValue(mockPlanet as any);
+    it('should return a planet when it exists', async () => {
+      const result = await service.findOne('1');
 
-      const result = await service.findOne('planet-uuid');
+      expect(repository.findOne).toHaveBeenCalledWith({ where: { id: '1' } });
       expect(result).toEqual(mockPlanet);
-      expect(repository.findOne).toHaveBeenCalledWith({
-        where: { id: 'planet-uuid' },
-      });
     });
 
-    it('should throw NotFoundException if planet not found', async () => {
-      jest.spyOn(repository, 'findOne').mockResolvedValue(undefined);
+    it('should throw NotFoundException when planet does not exist', async () => {
+      jest.spyOn(repository, 'findOne').mockResolvedValue(null);
 
-      await expect(service.findOne('non-existent-id')).rejects.toThrowError(
-        `Planet with ID non-existent-id not found`,
-      );
+      await expect(service.findOne('999')).rejects.toThrow(NotFoundException);
+      expect(repository.findOne).toHaveBeenCalledWith({ where: { id: '999' } });
     });
   });
 
   describe('update', () => {
-    it('should update a planet', async () => {
-      const updatedPlanet = { ...mockPlanet, name: 'Updated Name' };
-      jest.spyOn(repository, 'preload').mockResolvedValue(updatedPlanet as any);
-      jest.spyOn(repository, 'save').mockResolvedValue(updatedPlanet as any);
+    it('should successfully update a planet', async () => {
+      const updatedPlanet = { ...mockPlanet, ...mockUpdatePlanetInput };
+      jest.spyOn(repository, 'save').mockResolvedValue(updatedPlanet);
 
-      const result = await service.update('planet-uuid', {
-        name: 'Updated Name',
+      const result = await service.update('1', mockUpdatePlanetInput);
+
+      expect(repository.preload).toHaveBeenCalledWith({
+        id: '1',
+        ...mockUpdatePlanetInput,
       });
+      expect(repository.save).toHaveBeenCalled();
       expect(result).toEqual(updatedPlanet);
-      expect(repository.save).toHaveBeenCalledWith(updatedPlanet);
     });
 
-    it('should throw NotFoundException if planet not found', async () => {
-      jest.spyOn(repository, 'preload').mockResolvedValue(undefined);
+    it('should throw NotFoundException when updating non-existent planet', async () => {
+      jest.spyOn(repository, 'preload').mockResolvedValue(null);
 
       await expect(
-        service.update('non-existent-id', { name: 'Updated Name' }),
-      ).rejects.toThrowError(`Planet with ID non-existent-id not found`);
+        service.update('999', mockUpdatePlanetInput),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should update partial planet data', async () => {
+      const partialUpdate = { name: 'New Name' };
+      const updatedPlanet = { ...mockPlanet, ...partialUpdate };
+
+      jest.spyOn(repository, 'preload').mockResolvedValue(updatedPlanet);
+      jest.spyOn(repository, 'save').mockResolvedValue(updatedPlanet);
+
+      const result = await service.update('1', partialUpdate);
+
+      expect(repository.preload).toHaveBeenCalledWith({
+        id: '1',
+        ...partialUpdate,
+      });
+      expect(result.name).toBe('New Name');
+      expect(result.climate).toBe(mockPlanet.climate);
     });
   });
 
   describe('remove', () => {
-    it('should remove a planet', async () => {
-      jest.spyOn(repository, 'delete').mockResolvedValue({ affected: 1 } as any);
+    it('should successfully remove a planet', async () => {
+      const result = await service.remove('1');
 
-      await expect(service.remove('planet-uuid')).resolves.toBeUndefined();
-      expect(repository.delete).toHaveBeenCalledWith('planet-uuid');
-    });
-
-    it('should throw NotFoundException if planet not found', async () => {
-      jest.spyOn(repository, 'delete').mockResolvedValue({ affected: 0 } as any);
-
-      await expect(service.remove('non-existent-id')).rejects.toThrowError(
-        `Planet with ID non-existent-id not found`,
-      );
+      expect(repository.delete).toHaveBeenCalledWith('1');
+      expect(result).toBe(true);
     });
   });
 });

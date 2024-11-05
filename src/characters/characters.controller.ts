@@ -10,16 +10,16 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import { CharactersService } from './characters.service';
-import { CreateCharacterDto } from './dto/create-character.dto';
-import { UpdateCharacterDto } from './dto/update-character.dto';
+import { CreateCharacterInput } from './dto/create-character.input';
+import { UpdateCharacterInput } from './dto/update-character.input';
 
 @Controller('characters')
 export class CharactersController {
-  constructor(private readonly charactersService: CharactersService) { }
+  constructor(private readonly charactersService: CharactersService) {}
 
   @Post()
   @UsePipes(new ValidationPipe({ whitelist: true }))
-  create(@Body() createCharacterDto: CreateCharacterDto) {
+  create(@Body() createCharacterDto: CreateCharacterInput) {
     return this.charactersService.create(createCharacterDto);
   }
 
@@ -37,7 +37,7 @@ export class CharactersController {
   @UsePipes(new ValidationPipe({ whitelist: true }))
   update(
     @Param('id') id: string,
-    @Body() updateCharacterDto: UpdateCharacterDto,
+    @Body() updateCharacterDto: UpdateCharacterInput,
   ) {
     return this.charactersService.update(id, updateCharacterDto);
   }

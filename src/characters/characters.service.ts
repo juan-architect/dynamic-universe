@@ -1,155 +1,219 @@
-import { Injectable, NotFoundException, Inject } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Repository, In } from 'typeorm';
-// Import the Cache module
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { CacheManagerStore } from 'cache-manager';
-
+import { InjectRepository } from '@nestjs/typeorm';
 import { Character } from '../entities/character.entity';
-import { CreateCharacterDto } from './dto/create-character.dto';
-import { UpdateCharacterDto } from './dto/update-character.dto';
 import { Planet } from '../entities/planet.entity';
+import { Starship } from '../entities/starship.entity';
+import { CreateCharacterInput } from './dto/create-character.input';
+import { UpdateCharacterInput } from './dto/update-character.input';
+import { RelocateCharacterInput } from './dto/relocate-character.input';
 
+/**
+ * Service responsible for handling business logic related to Characters.
+ * Includes methods for creating, retrieving, updating, and deleting characters.
+ */
 @Injectable()
 export class CharactersService {
   constructor(
     @InjectRepository(Character)
-    private charactersRepository: Repository<Character>,
+    private readonly charactersRepository: Repository<Character>,
     @InjectRepository(Planet)
-    private planetsRepository: Repository<Planet>,
-    @Inject(CACHE_MANAGER) private cacheManager: CacheManagerStore,
-  ) { }
+    private readonly planetsRepository: Repository<Planet>,
+    @InjectRepository(Starship)
+    private readonly starshipsRepository: Repository<Starship>,
+  ) {}
 
-  async create(createCharacterDto: CreateCharacterDto): Promise<Character> {
-    const { currentLocationId, ...rest } = createCharacterDto;
-    const planet = await this.planetsRepository.findOne({
-      where: { id: currentLocationId },
-    });
+  /**
+   * Creates a new character.
+   * @param createCharacterInput - The data required to create a character.
+   * @returns The created character entity.
+   */
+  async create(createCharacterInput: CreateCharacterInput): Promise<Character> {
+    const { currentLocationId, starshipIds, ...rest } = createCharacterInput;
 
-    if (!planet) {
-      throw new NotFoundException(
-        `Planet with ID ${currentLocationId} not found`,
-      );
+    // Create a new character instance
+    const character = this.charactersRepository.create(rest);
+
+    // Associate current location if provided
+    if (currentLocationId) {
+      const currentLocation = await this.planetsRepository.findOne({
+        where: { id: currentLocationId },
+      });
+      if (!currentLocation) {
+        throw new NotFoundException(
+          `Planet with ID ${currentLocationId} not found`,
+        );
+      }
+      character.currentLocation = currentLocation;
     }
 
-    const character = this.charactersRepository.create({
-      ...rest,
-      currentLocation: planet,
-    });
-    const savedCharacter = await this.charactersRepository.save(character);
+    // Associate starships if provided
+    if (starshipIds && starshipIds.length > 0) {
+      const starships = await this.starshipsRepository.find({
+        where: { id: In(starshipIds) },
+      });
+      character.starships = starships;
+    }
 
-    // Invalidate cache
-    await this.cacheManager.del('characters');
-
-    return savedCharacter;
+    // Save the character to the database
+    return this.charactersRepository.save(character);
   }
 
+  /**
+   * Retrieves all characters.
+   * @returns An array of character entities.
+   */
   async findAll(): Promise<Character[]> {
-    const cacheKey = 'characters';
-    const cachedCharacters = (await this.cacheManager.get(
-      cacheKey,
-    )) as Character[] | undefined;
-
-    if (cachedCharacters) {
-      return cachedCharacters;
-    }
-
-    const characters = await this.charactersRepository.find({
-      relations: ['currentLocation'],
+    return this.charactersRepository.find({
+      relations: ['currentLocation', 'starships'],
     });
-    await this.cacheManager.set(cacheKey, characters, 300);
-
-    return characters;
   }
 
+  /**
+   * Retrieves a character by its ID.
+   * @param id - The unique identifier of the character.
+   * @returns The character entity.
+   * @throws NotFoundException if the character is not found.
+   */
   async findOne(id: string): Promise<Character> {
-    const cacheKey = `character:${id}`;
-    const cachedCharacter = (await this.cacheManager.get(
-      cacheKey,
-    )) as Character | undefined;
-
-    if (cachedCharacter) {
-      return cachedCharacter;
-    }
-
     const character = await this.charactersRepository.findOne({
       where: { id },
-      relations: ['currentLocation'],
+      relations: ['currentLocation', 'starships'],
     });
     if (!character) {
       throw new NotFoundException(`Character with ID ${id} not found`);
     }
-
-    await this.cacheManager.set(cacheKey, character, 300);
-
     return character;
   }
 
+  /**
+   * Updates an existing character.
+   * @param id - The unique identifier of the character to update.
+   * @param updateCharacterInput - The new data for the character.
+   * @returns The updated character entity.
+   * @throws NotFoundException if the character is not found.
+   */
   async update(
     id: string,
-    updateCharacterDto: UpdateCharacterDto,
+    updateCharacterInput: UpdateCharacterInput,
   ): Promise<Character> {
-    const character = await this.charactersRepository.findOne({
-      where: { id },
-      relations: ['currentLocation'],
-    });
+    const { currentLocationId, starshipIds, ...rest } = updateCharacterInput;
 
+    // Find the character to update
+    let character = await this.charactersRepository.findOne({ where: { id } });
     if (!character) {
       throw new NotFoundException(`Character with ID ${id} not found`);
     }
 
-    if (updateCharacterDto.currentLocationId) {
-      const planet = await this.planetsRepository.findOne({
-        where: { id: updateCharacterDto.currentLocationId },
-      });
-      if (!planet) {
-        throw new NotFoundException(
-          `Planet with ID ${updateCharacterDto.currentLocationId} not found`,
-        );
+    // Update basic fields
+    character = { ...character, ...rest };
+
+    // Update current location if provided
+    if (currentLocationId !== undefined) {
+      if (currentLocationId === null) {
+        character.currentLocation = null;
+      } else {
+        const currentLocation = await this.planetsRepository.findOne({
+          where: { id: currentLocationId },
+        });
+        if (!currentLocation) {
+          throw new NotFoundException(
+            `Planet with ID ${currentLocationId} not found`,
+          );
+        }
+        character.currentLocation = currentLocation;
       }
-      character.currentLocation = planet;
     }
 
-    Object.assign(character, updateCharacterDto);
-    const updatedCharacter = await this.charactersRepository.save(character);
+    // Update starships if provided
+    if (starshipIds !== undefined) {
+      if (starshipIds.length === 0) {
+        character.starships = [];
+      } else {
+        const starships = await this.starshipsRepository.find({
+          where: { id: In(starshipIds) },
+        });
+        character.starships = starships;
+      }
+    }
 
-    // Invalidate cache
-    await this.cacheManager.del('characters');
-    await this.cacheManager.del(`character:${id}`);
-
-    return updatedCharacter;
+    // Save the updated character to the database
+    return this.charactersRepository.save(character);
   }
 
-  async remove(id: string): Promise<void> {
+  /**
+   * Deletes a character by its ID.
+   * @param id - The unique identifier of the character to delete.
+   * @returns A boolean indicating the success of the operation.
+   * @throws NotFoundException if the character is not found.
+   */
+  async remove(id: string): Promise<boolean> {
     const result = await this.charactersRepository.delete(id);
     if (result.affected === 0) {
       throw new NotFoundException(`Character with ID ${id} not found`);
     }
-
-    // Invalidate cache
-    await this.cacheManager.del('characters');
-    await this.cacheManager.del(`character:${id}`);
+    return true;
   }
 
-  async relocate(characterId: string, planetId: string): Promise<Character> {
+  /**
+   * Retrieves the current location of a character.
+   * Used by the resolver to populate the 'currentLocation' field.
+   * @param character - The character entity.
+   * @returns The planet entity.
+   */
+  async getCurrentLocation(character: Character): Promise<Planet> {
+    if (character.currentLocation) {
+      return character.currentLocation;
+    }
+    return null;
+  }
+
+  /**
+   * Retrieves the starships associated with a character.
+   * Used by the resolver to populate the 'starships' field.
+   * @param character - The character entity.
+   * @returns An array of starship entities.
+   */
+  async getStarships(character: Character): Promise<Starship[]> {
+    if (character.starships) {
+      return character.starships;
+    }
+    return [];
+  }
+
+  /**
+   * Relocates a character to a new current location (planet).
+   * @param id - The ID of the character to relocate.
+   * @param relocateCharacterInput - Contains the new location ID.
+   * @returns The updated character entity.
+   * @throws NotFoundException if the character or new location is not found.
+   */
+  async relocateCharacter(
+    id: string,
+    relocateCharacterInput: RelocateCharacterInput,
+  ): Promise<Character> {
+    // Find the character to relocate
     const character = await this.charactersRepository.findOne({
-      where: { id: characterId },
-      relations: ['currentLocation'],
+      where: { id },
     });
-
     if (!character) {
-      throw new NotFoundException(`Character with ID ${characterId} not found`);
+      throw new NotFoundException(`Character with ID ${id} not found`);
     }
 
-    const planet = await this.planetsRepository.findOne({
-      where: { id: planetId },
+    // Find the new location (planet)
+    const newLocation = await this.planetsRepository.findOne({
+      where: { id: relocateCharacterInput.newLocationId },
     });
-
-    if (!planet) {
-      throw new NotFoundException(`Planet with ID ${planetId} not found`);
+    if (!newLocation) {
+      throw new NotFoundException(
+        `Planet with ID ${relocateCharacterInput.newLocationId} not found`,
+      );
     }
 
-    character.currentLocation = planet;
+    // Update the character's currentLocation
+    character.currentLocation = newLocation;
+
+    // Save and return the updated character
     return this.charactersRepository.save(character);
   }
 }

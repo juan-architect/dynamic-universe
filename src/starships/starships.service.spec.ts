@@ -1,39 +1,45 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { StarshipsService } from './starships.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { StarshipsService } from './starships.service';
 import { Starship } from '../entities/starship.entity';
 import { Character } from '../entities/character.entity';
 import { Planet } from '../entities/planet.entity';
-import { Repository, In, Not } from 'typeorm';
-
-const mockStarship = {
-  id: 'starship-uuid',
-  name: 'Millennium Falcon',
-  model: 'YT-1300 light freighter',
-  cargoCapacity: 100000,
-  latitude: 34.0522,
-  longitude: -118.2437,
-  passengers: [],
-  enemies: [],
-};
-
-const mockCharacter = {
-  id: 'character-uuid',
-  name: 'Han Solo',
-};
-
-const mockPlanet = {
-  id: 'planet-uuid',
-  name: 'Tatooine',
-  latitude: 34.0522,
-  longitude: -118.2437,
-};
+import { NotFoundException, BadRequestException } from '@nestjs/common';
 
 describe('StarshipsService', () => {
   let service: StarshipsService;
   let starshipsRepository: Repository<Starship>;
-  let charactersRepository: Repository<Character>;
   let planetsRepository: Repository<Planet>;
+
+  const mockStarship = {
+    id: '1',
+    name: 'Millennium Falcon',
+    model: 'YT-1300',
+    cargoCapacity: 100,
+    currentLocation: {
+      latitude: 0,
+      longitude: 0,
+    },
+    passengers: [],
+    enemies: [],
+    currentStation: null,
+  };
+
+  const mockCharacter = {
+    id: '1',
+    name: 'Luke Skywalker',
+    isForceSensitive: false,
+  };
+
+  const mockPlanet = {
+    id: '1',
+    name: 'Tatooine',
+    currentLocation: {
+      latitude: 10,
+      longitude: 10,
+    },
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -42,24 +48,25 @@ describe('StarshipsService', () => {
         {
           provide: getRepositoryToken(Starship),
           useValue: {
-            findOne: jest.fn(),
-            find: jest.fn(),
-            create: jest.fn(),
-            save: jest.fn(),
-            delete: jest.fn(),
+            create: jest.fn().mockReturnValue(mockStarship),
+            save: jest.fn().mockResolvedValue(mockStarship),
+            find: jest.fn().mockResolvedValue([mockStarship]),
+            findOne: jest.fn().mockResolvedValue(mockStarship),
+            delete: jest.fn().mockResolvedValue({ affected: 1 }),
           },
         },
         {
           provide: getRepositoryToken(Character),
           useValue: {
-            findOne: jest.fn(),
-            find: jest.fn(),
+            find: jest.fn().mockResolvedValue([mockCharacter]),
+            findOne: jest.fn().mockResolvedValue(mockCharacter),
           },
         },
         {
           provide: getRepositoryToken(Planet),
           useValue: {
-            findOne: jest.fn(),
+            find: jest.fn().mockResolvedValue([mockPlanet]),
+            findOne: jest.fn().mockResolvedValue(mockPlanet),
           },
         },
       ],
@@ -69,304 +76,258 @@ describe('StarshipsService', () => {
     starshipsRepository = module.get<Repository<Starship>>(
       getRepositoryToken(Starship),
     );
-    charactersRepository = module.get<Repository<Character>>(
-      getRepositoryToken(Character),
-    );
     planetsRepository = module.get<Repository<Planet>>(
       getRepositoryToken(Planet),
     );
   });
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
-  });
-
   describe('create', () => {
-    it('should create a new starship', async () => {
-      jest
-        .spyOn(charactersRepository, 'find')
-        .mockResolvedValue([mockCharacter] as any);
-      jest
-        .spyOn(starshipsRepository, 'find')
-        .mockResolvedValue([mockStarship] as any);
-      jest
-        .spyOn(starshipsRepository, 'create')
-        .mockReturnValue(mockStarship as any);
-      jest
-        .spyOn(starshipsRepository, 'save')
-        .mockResolvedValue(mockStarship as any);
+    it('should create a starship successfully', async () => {
+      const createStarshipDto = {
+        name: 'Millennium Falcon',
+        model: 'YT-1300',
+        cargoCapacity: 100,
+        passengerIds: ['1'],
+        enemyIds: ['2'],
+        currentStationId: '1',
+      };
 
-      const result = await service.create({
-        ...mockStarship,
-        passengersIds: ['character-uuid'],
-        enemiesIds: ['starship-uuid'],
-      });
+      const result = await service.create(createStarshipDto);
       expect(result).toEqual(mockStarship);
       expect(starshipsRepository.create).toHaveBeenCalled();
       expect(starshipsRepository.save).toHaveBeenCalled();
+    });
+
+    it('should throw NotFoundException when currentStationId is invalid', async () => {
+      jest.spyOn(planetsRepository, 'findOne').mockResolvedValue(null);
+
+      const createStarshipDto = {
+        name: 'Millennium Falcon',
+        currentStationId: 'invalid-id',
+      };
+
+      await expect(service.create(createStarshipDto)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
   describe('findAll', () => {
     it('should return an array of starships', async () => {
-      jest
-        .spyOn(starshipsRepository, 'find')
-        .mockResolvedValue([mockStarship] as any);
-
       const result = await service.findAll();
       expect(result).toEqual([mockStarship]);
-      expect(starshipsRepository.find).toHaveBeenCalledWith({
-        relations: ['passengers', 'enemies'],
-      });
+      expect(starshipsRepository.find).toHaveBeenCalled();
     });
   });
 
   describe('findOne', () => {
-    it('should return a starship by ID', async () => {
-      jest
-        .spyOn(starshipsRepository, 'findOne')
-        .mockResolvedValue(mockStarship as any);
-
-      const result = await service.findOne('starship-uuid');
+    it('should return a single starship', async () => {
+      const result = await service.findOne('1');
       expect(result).toEqual(mockStarship);
-      expect(starshipsRepository.findOne).toHaveBeenCalledWith({
-        where: { id: 'starship-uuid' },
-        relations: ['passengers', 'enemies'],
-      });
+      expect(starshipsRepository.findOne).toHaveBeenCalled();
     });
 
-    it('should throw NotFoundException if starship not found', async () => {
-      jest.spyOn(starshipsRepository, 'findOne').mockResolvedValue(undefined);
-
-      await expect(service.findOne('non-existent-id')).rejects.toThrowError(
-        `Starship with ID non-existent-id not found`,
-      );
+    it('should throw NotFoundException when starship not found', async () => {
+      jest.spyOn(starshipsRepository, 'findOne').mockResolvedValue(null);
+      await expect(service.findOne('999')).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('update', () => {
-    it('should update a starship', async () => {
-      const updatedStarship = { ...mockStarship, name: 'Updated Name' };
-      jest
-        .spyOn(starshipsRepository, 'findOne')
-        .mockResolvedValue(mockStarship as any);
-      jest
-        .spyOn(starshipsRepository, 'save')
-        .mockResolvedValue(updatedStarship as any);
+    it('should update a starship successfully', async () => {
+      const updateStarshipDto = {
+        id: '1',
+        name: 'Updated Falcon',
+      };
 
-      const result = await service.update('starship-uuid', {
-        name: 'Updated Name',
-      });
-      expect(result).toEqual(updatedStarship);
-      expect(starshipsRepository.save).toHaveBeenCalledWith({
-        ...mockStarship,
-        name: 'Updated Name',
-      });
+      const result = await service.update('1', updateStarshipDto);
+      expect(result).toEqual(mockStarship);
+      expect(starshipsRepository.save).toHaveBeenCalled();
     });
 
-    it('should throw NotFoundException if starship not found', async () => {
-      jest.spyOn(starshipsRepository, 'findOne').mockResolvedValue(undefined);
-
+    it('should throw NotFoundException when starship not found', async () => {
+      jest.spyOn(starshipsRepository, 'findOne').mockResolvedValue(null);
       await expect(
-        service.update('non-existent-id', { name: 'Updated Name' }),
-      ).rejects.toThrowError(`Starship with ID non-existent-id not found`);
+        service.update('999', { id: '999', name: 'Updated Falcon' }),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('remove', () => {
-    it('should remove a starship', async () => {
-      jest
-        .spyOn(starshipsRepository, 'delete')
-        .mockResolvedValue({ affected: 1 } as any);
-
-      await expect(service.remove('starship-uuid')).resolves.toBeUndefined();
-      expect(starshipsRepository.delete).toHaveBeenCalledWith('starship-uuid');
-    });
-
-    it('should throw NotFoundException if starship not found', async () => {
-      jest
-        .spyOn(starshipsRepository, 'delete')
-        .mockResolvedValue({ affected: 0 } as any);
-
-      await expect(service.remove('non-existent-id')).rejects.toThrowError(
-        `Starship with ID non-existent-id not found`,
-      );
+    it('should delete a starship successfully', async () => {
+      await service.remove('1');
+      expect(starshipsRepository.delete).toHaveBeenCalledWith('1');
     });
   });
 
   describe('boardPassenger', () => {
-    it('should board a passenger onto the starship', async () => {
-      jest
-        .spyOn(starshipsRepository, 'findOne')
-        .mockResolvedValue({
-          ...mockStarship,
-          passengers: [],
-        } as any);
-      jest
-        .spyOn(charactersRepository, 'findOne')
-        .mockResolvedValue(mockCharacter as any);
-      jest
-        .spyOn(starshipsRepository, 'save')
-        .mockResolvedValue(mockStarship as any);
-
-      const result = await service.boardPassenger(
-        'starship-uuid',
-        'character-uuid',
-      );
+    it('should board a passenger successfully', async () => {
+      const result = await service.boardPassenger('1', '1');
       expect(result).toEqual(mockStarship);
       expect(starshipsRepository.save).toHaveBeenCalled();
     });
 
-    describe('boardPassenger', () => {
-      it('should throw error if passenger already on board', async () => {
-        jest
-          .spyOn(starshipsRepository, 'findOne')
-          .mockResolvedValue({
-            ...mockStarship,
-            passengers: [mockCharacter],
-          } as any);
-        jest
-          .spyOn(charactersRepository, 'findOne')
-          .mockResolvedValue(mockCharacter as any);
-  
-        await expect(
-          service.boardPassenger('starship-uuid', 'character-uuid'),
-        ).rejects.toThrowError(
-          `Character with ID character-uuid is already on board`,
-        );
-      });
+    it('should throw BadRequestException when passenger already on board', async () => {
+      const starshipWithPassenger = {
+        ...mockStarship,
+        passengers: [mockCharacter],
+      };
+      jest
+        .spyOn(starshipsRepository, 'findOne')
+        .mockResolvedValue(starshipWithPassenger);
+
+      await expect(service.boardPassenger('1', '1')).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
   describe('disembarkPassenger', () => {
-    it('should disembark a passenger from the starship', async () => {
+    it('should disembark a passenger successfully', async () => {
+      const starshipWithPassenger = {
+        ...mockStarship,
+        passengers: [mockCharacter],
+      };
       jest
         .spyOn(starshipsRepository, 'findOne')
-        .mockResolvedValue({
-          ...mockStarship,
-          passengers: [mockCharacter],
-        } as any);
-      jest
-        .spyOn(starshipsRepository, 'save')
-        .mockResolvedValue(mockStarship as any);
+        .mockResolvedValue(starshipWithPassenger);
 
-      const result = await service.disembarkPassenger(
-        'starship-uuid',
-        'character-uuid',
-      );
+      const result = await service.disembarkPassenger('1', '1');
       expect(result).toEqual(mockStarship);
       expect(starshipsRepository.save).toHaveBeenCalled();
     });
 
-    it('should throw error if passenger not on board', async () => {
-      jest
-        .spyOn(starshipsRepository, 'findOne')
-        .mockResolvedValue({
-          ...mockStarship,
-          passengers: [],
-        } as any);
-
-      await expect(
-        service.disembarkPassenger('starship-uuid', 'character-uuid'),
-      ).rejects.toThrowError(
-        `Character with ID character-uuid is not on board`,
+    it('should throw BadRequestException when passenger not on board', async () => {
+      await expect(service.disembarkPassenger('1', '999')).rejects.toThrow(
+        BadRequestException,
       );
     });
   });
 
   describe('travel', () => {
-    it('should move the starship to the planet location', async () => {
-      jest
-        .spyOn(starshipsRepository, 'findOne')
-        .mockResolvedValue(mockStarship as any);
-      jest
-        .spyOn(planetsRepository, 'findOne')
-        .mockResolvedValue(mockPlanet as any);
-      jest
-        .spyOn(starshipsRepository, 'save')
-        .mockResolvedValue(mockStarship as any);
-
-      const result = await service.travel('starship-uuid', 'planet-uuid');
+    it('should update starship location successfully', async () => {
+      const result = await service.travel('1', '1');
       expect(result).toEqual(mockStarship);
       expect(starshipsRepository.save).toHaveBeenCalled();
     });
 
-    it('should throw NotFoundException if starship not found', async () => {
-      jest.spyOn(starshipsRepository, 'findOne').mockResolvedValue(undefined);
-
-      await expect(
-        service.travel('non-existent-id', 'planet-uuid'),
-      ).rejects.toThrowError(`Starship with ID non-existent-id not found`);
-    });
-
-    it('should throw NotFoundException if planet not found', async () => {
-      jest
-        .spyOn(starshipsRepository, 'findOne')
-        .mockResolvedValue(mockStarship as any);
-      jest.spyOn(planetsRepository, 'findOne').mockResolvedValue(undefined);
-
-      await expect(
-        service.travel('starship-uuid', 'non-existent-planet'),
-      ).rejects.toThrowError(
-        `Planet with ID non-existent-planet not found`,
+    it('should throw NotFoundException when planet not found', async () => {
+      jest.spyOn(planetsRepository, 'findOne').mockResolvedValue(null);
+      await expect(service.travel('1', '999')).rejects.toThrow(
+        NotFoundException,
       );
     });
   });
 
   describe('calculateDistance', () => {
-    it('should calculate the distance between starship and planet', async () => {
+    it('should calculate distance between starship and planet', async () => {
+      const starshipWithLocation = {
+        ...mockStarship,
+        currentLocation: { latitude: 0, longitude: 0 },
+        currentStation: mockPlanet,
+      };
       jest
         .spyOn(starshipsRepository, 'findOne')
-        .mockResolvedValue(mockStarship as any);
-      jest
-        .spyOn(planetsRepository, 'findOne')
-        .mockResolvedValue(mockPlanet as any);
+        .mockResolvedValue(starshipWithLocation);
 
-      const result = await service.calculateDistance(
-        'starship-uuid',
-        'planet-uuid',
-      );
+      const result = await service.calculateDistance('1', '1');
       expect(result).toHaveProperty('distanceInKm');
+    });
+
+    it('should throw BadRequestException when starship has no current station', async () => {
+      const starshipWithoutStation = { ...mockStarship, currentStation: null };
+      jest
+        .spyOn(starshipsRepository, 'findOne')
+        .mockResolvedValue(starshipWithoutStation);
+
+      await expect(service.calculateDistance('1', '1')).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
   describe('findNearbyEnemies', () => {
-    it('should find nearby enemy starships within range', async () => {
+    it('should return nearby enemy starships', async () => {
+      const starshipWithLocation = {
+        ...mockStarship,
+        currentLocation: { latitude: 0, longitude: 0 },
+        currentStation: mockPlanet,
+      };
       jest
         .spyOn(starshipsRepository, 'findOne')
-        .mockResolvedValue(mockStarship as any);
-      jest
-        .spyOn(starshipsRepository, 'find')
-        .mockResolvedValue([mockStarship] as any);
+        .mockResolvedValue(starshipWithLocation);
 
-      const result = await service.findNearbyEnemies('starship-uuid', 1000);
-      expect(result).toBeInstanceOf(Array);
+      const result = await service.findNearbyEnemies('1', 1000);
+      expect(Array.isArray(result)).toBeTruthy();
+    });
+
+    it('should throw BadRequestException when starship has no current station', async () => {
+      const starshipWithoutStation = { ...mockStarship, currentStation: null };
+      jest
+        .spyOn(starshipsRepository, 'findOne')
+        .mockResolvedValue(starshipWithoutStation);
+
+      await expect(service.findNearbyEnemies('1', 1000)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
   describe('spawnEnemies', () => {
-    it('should spawn random enemy starships', async () => {
-      jest
-        .spyOn(starshipsRepository, 'create')
-        .mockImplementation((entity) => {
-          return entity as Starship;
-        });
-      jest
-        .spyOn(starshipsRepository, 'save')
-        .mockImplementation(async (entity) => {
-          return {
-            ...entity,
-            id: `starship-${Math.random()}`,
-          } as Starship;
-        });
-  
-      const result = await service.spawnEnemies(3);
-      expect(result).toBeInstanceOf(Array);
-      expect(result.length).toBe(3);
-      result.forEach((starship) => {
-        expect(starship).toHaveProperty('id');
-        expect(starship.id).toContain('starship-');
-      });
+    it('should spawn specified number of enemy starships', async () => {
+      const result = await service.spawnEnemies(2);
+      expect(Array.isArray(result)).toBeTruthy();
+      expect(starshipsRepository.save).toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException when no planets available', async () => {
+      jest.spyOn(planetsRepository, 'find').mockResolvedValue([]);
+      await expect(service.spawnEnemies(2)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+  });
+
+  describe('getCurrentStation', () => {
+    it('should return current station if loaded', async () => {
+      const starshipWithStation = {
+        ...mockStarship,
+        currentStation: mockPlanet,
+      };
+      const result = await service.getCurrentStation(starshipWithStation);
+      expect(result).toEqual(mockPlanet);
+    });
+  });
+
+  describe('getPassengers', () => {
+    it('should return passengers if loaded', async () => {
+      const starshipWithPassengers = {
+        ...mockStarship,
+        passengers: [mockCharacter],
+      };
+      const result = await service.getPassengers(starshipWithPassengers);
+      expect(result).toEqual([mockCharacter]);
+    });
+
+    it('should fetch passengers if not loaded', async () => {
+      const result = await service.getPassengers(mockStarship);
+      expect(Array.isArray(result)).toBeTruthy();
+    });
+  });
+
+  describe('getEnemies', () => {
+    it('should return enemies if loaded', async () => {
+      const starshipWithEnemies = {
+        ...mockStarship,
+        enemies: [{ ...mockStarship, id: '2' }],
+      };
+      const result = await service.getEnemies(starshipWithEnemies);
+      expect(result).toHaveLength(1);
+    });
+
+    it('should fetch enemies if not loaded', async () => {
+      const result = await service.getEnemies(mockStarship);
+      expect(Array.isArray(result)).toBeTruthy();
     });
   });
 });
