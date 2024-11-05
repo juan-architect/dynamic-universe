@@ -1,0 +1,73 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type Coordinates {
+  latitude: Float!
+  longitude: Float!
+}
+
+type Starship {
+  id: ID!
+  name: String!
+  model: String
+  cargoCapacity: Float
+  currentLocation: Coordinates
+  currentStation: Planet
+  passengers: [Character!]
+  enemies: [Starship!]
+}
+
+type Character {
+  id: ID!
+  name: String!
+  species: String
+  isForceSensitive: Boolean!
+  currentLocation: Planet
+  homeWorld: Planet
+  starships: [Starship!]
+}
+
+type Planet {
+  id: ID!
+  name: String!
+  climate: String
+  terrain: String
+  population: Float
+  currentLocation: Coordinates
+  residents: [Character!]
+  natives: [Character!]
+  stationedStarships: [Starship!]
+}
+
+type Query {
+  planets: [Planet!]!
+  planet(id: ID!): Planet!
+}
+
+type Mutation {
+  createPlanet(createPlanetInput: CreatePlanetInput!): Planet!
+  updatePlanet(id: ID!, updatePlanetInput: UpdatePlanetInput!): Planet!
+  deletePlanet(id: ID!): Boolean!
+}
+
+input CreatePlanetInput {
+  name: String!
+  currentLocation: CoordinatesInput
+  population: Float
+  climate: String
+  terrain: String
+}
+
+input CoordinatesInput {
+  latitude: Float!
+  longitude: Float!
+}
+
+input UpdatePlanetInput {
+  name: String
+  currentLocation: CoordinatesInput
+  population: Float
+  climate: String
+  terrain: String
+}

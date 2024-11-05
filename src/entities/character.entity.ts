@@ -62,9 +62,7 @@ export class Character {
    * Establishes a many-to-many relationship with the Starship entity.
    */
   @Field(() => [Starship], { nullable: true })
-  @ManyToMany(() => Starship, (starship) => starship.passengers, {
-    cascade: true,
-  })
+  @ManyToMany(() => Starship, (starship) => starship.passengers)
   @JoinTable()
   starships?: Starship[];
 }

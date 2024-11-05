@@ -5,9 +5,10 @@ import { CharactersService } from './characters.service';
 import { CharactersController } from './characters.controller';
 import { Character } from '../entities/character.entity';
 import { Planet } from '../entities/planet.entity';
+import { Starship } from '../entities/starship.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Character, Planet])],
+  imports: [TypeOrmModule.forFeature([Character, Planet, Starship])],
   providers: [CharactersService],
   controllers: [CharactersController],
 })

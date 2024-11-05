@@ -52,6 +52,8 @@ export class CharactersController {
     @Param('id') characterId: string,
     @Body('planetId') planetId: string,
   ) {
-    return this.charactersService.relocate(characterId, planetId);
+    return this.charactersService.relocateCharacter(characterId, {
+      newLocationId: planetId,
+    });
   }
 }
